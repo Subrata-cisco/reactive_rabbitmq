@@ -16,17 +16,20 @@
 
 package com.subrata.reactorrabbit;
 
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import reactor.core.publisher.Flux;
 import reactor.rabbitmq.OutboundMessage;
 import reactor.rabbitmq.OutboundMessageResult;
 import reactor.rabbitmq.QueueSpecification;
 import reactor.rabbitmq.RabbitFlux;
+import reactor.rabbitmq.RabbitFluxException;
+import reactor.rabbitmq.SendOptions;
 import reactor.rabbitmq.Sender;
-
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
 /**
  *
@@ -43,13 +46,23 @@ public class SampleSender {
     }
 
     public void send(String queue, int count, CountDownLatch latch) {
+    	
+    	SendOptions sendOptions = new SendOptions().exceptionHandler(((sendContext, e) -> {
+    		OutboundMessage msg = sendContext.getMessage();
+    		System.out.println("********** SampleSender.send() Exception handler :"+e.getMessage()+"  for msg :"+new String(msg.getBody()));
+            throw new RabbitFluxException(e);
+    	}));
+    	
+    	
         Flux<OutboundMessageResult> confirmations = sender.sendWithPublishConfirms(Flux.range(1, count)
-            .map(i -> new OutboundMessage("", queue, ("Message_" + i).getBytes())));
+            .map(i -> new OutboundMessage("", queue, ("Message_" + i).getBytes())),sendOptions);
 
         sender.declareQueue(QueueSpecification.queue(queue))
             .thenMany(confirmations)
-                .doOnError(e -> LOGGER.error("Send failed", e))
+                .doOnError(e -> System.out.println("*************** Send failed :"+ e))
+                //.retry(3)
                 .subscribe(r -> {
+                	System.out.println("*********** SampleSender.send() ack :"+r.isAck());
                     if (r.isAck()) {
                         LOGGER.info("Message {} sent successfully", new String(r.getOutboundMessage().getBody()));
                         System.out.println("SampleSender.send() Message {} sent successfully "+ new String(r.getOutboundMessage().getBody()));
