@@ -7,7 +7,7 @@ import com.subrata.reactorrabbit.SampleReceiver;
 
 public class ReceiverClient {
 	public static void main(String[] args) throws InterruptedException {
-        int count = 200;
+        int count = 20000;
         CountDownLatch receiveLatch = new CountDownLatch(count);
         SampleReceiver receiver = new SampleReceiver();
         receiver.consume(Constants.queue, receiveLatch);

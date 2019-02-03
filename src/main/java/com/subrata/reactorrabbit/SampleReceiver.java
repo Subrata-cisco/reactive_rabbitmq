@@ -16,10 +16,15 @@
 
 package com.subrata.reactorrabbit;
 
-import com.rabbitmq.client.AMQP;
-import com.rabbitmq.client.Delivery;
+import java.time.Duration;
+import java.util.concurrent.CountDownLatch;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.rabbitmq.client.AMQP;
+import com.rabbitmq.client.Delivery;
+
 import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -27,9 +32,6 @@ import reactor.rabbitmq.QueueSpecification;
 import reactor.rabbitmq.RabbitFlux;
 import reactor.rabbitmq.Receiver;
 import reactor.rabbitmq.Sender;
-
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
 /**
  *
@@ -46,30 +48,27 @@ public class SampleReceiver {
         this.receiver = RabbitFlux.createReceiver();
         this.sender = RabbitFlux.createSender();
     }
+    
+    long time = System.currentTimeMillis();
 
     public Disposable consume(String queue, CountDownLatch latch) {
         Mono<AMQP.Queue.DeclareOk> queueDeclaration = sender.declareQueue(QueueSpecification.queue(queue));
         Flux<Delivery> messages = receiver.consumeAutoAck(queue);
-        return queueDeclaration.thenMany(messages).subscribe(m -> {
-            LOGGER.info("Received message {}", new String(m.getBody()));
-            System.out.println("SampleReceiver.consume() Received message {}"+ new String(m.getBody()));
-            latch.countDown();
-        });
+        return queueDeclaration
+        		.thenMany(messages)
+        		.retryBackoff(3, Duration.ofSeconds(1))
+        		.delayUntil(a -> Flux.just(1,2).hide().delayElements(Duration.ofSeconds(1)))
+        		.subscribe(m -> {
+        			long delay =  System.currentTimeMillis() - time;
+        			time = System.currentTimeMillis();
+		            System.out.println("*************** Received message {}"+ new String(m.getBody())+" with delay (ms) :"+delay);
+		            latch.countDown();
+		         });
     }
 
     public void close() {
         this.sender.close();
         this.receiver.close();
-    }
-
-    public static void main(String[] args) throws Exception {
-        int count = 20;
-        CountDownLatch latch = new CountDownLatch(count);
-        SampleReceiver receiver = new SampleReceiver();
-        Disposable disposable = receiver.consume(QUEUE, latch);
-        latch.await(10, TimeUnit.SECONDS);
-        disposable.dispose();
-        receiver.close();
     }
 
 }

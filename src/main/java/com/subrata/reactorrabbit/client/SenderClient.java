@@ -22,6 +22,7 @@ public class SenderClient {
         SampleSender sender = new SampleSender();
         sender.send(Constants.queue, count, sendLatch);
         sendLatch.await(10, TimeUnit.MINUTES);
+        System.out.println("*************** SenderClient.main() total messages sent :"+sender.getTotalSent());
         sender.close();
 	}
 
