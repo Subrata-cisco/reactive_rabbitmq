@@ -29,7 +29,7 @@ public class PureRabbitSender {
 		com.rabbitmq.client.Connection connection = factory.newConnection();
 		connection.addBlockedListener(new BlockedListener() {
 			public void handleBlocked(String reason) throws IOException {
-				System.out.println("*************** Sender handleBlocked()");
+				System.out.println("*************** Sender handleBlocked()  reason is :"+reason);
 			}
 
 			public void handleUnblocked() throws IOException {
